@@ -1,0 +1,22 @@
+{
+  "name": "@wovemark/parser",
+  "version": "1.0.0",
+  "description": "Declarative parser, AST builder, and schema validator for Wovemark documents",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": ["wovemark", "markdown", "parser", "ast", "ai-agents"],
+  "author": "Wovemark Team",
+  "license": "MIT"
+}

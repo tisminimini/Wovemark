@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vortex SaaS Dashboard</title>
+  <link rel="stylesheet" href="../../packages/runtime/dist/styles.css" />
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    import { createWovemark, dataStore } from "../../packages/runtime/dist/index.js";
+
+    // Set sample mock data for dashboard
+    dataStore.setMock("recentTransactions", [
+      { id: "TX-9041", customer: "Acme Corp", plan: "Enterprise", amount: "$4,900.00", status: "Paid", date: "Today, 14:23" },
+      { id: "TX-9040", customer: "Starlight Media", plan: "Pro Annual", amount: "$1,188.00", status: "Paid", date: "Today, 11:05" },
+      { id: "TX-9039", customer: "Nexus AI", plan: "Pro Monthly", amount: "$99.00", status: "Paid", date: "Yesterday" },
+      { id: "TX-9038", customer: "Krona Systems", plan: "Enterprise", amount: "$8,500.00", status: "Processing", date: "Yesterday" },
+      { id: "TX-9037", customer: "Vanguard Tech", plan: "Pro Monthly", amount: "$99.00", status: "Paid", date: "Aug 28, 2026" }
+    ]);
+
+    createWovemark({
+      mount: "#app"
+    });
+  </script>
+</body>
+</html>

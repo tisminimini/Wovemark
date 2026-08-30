@@ -1,0 +1,26 @@
+{
+  "name": "@wovemark/runtime",
+  "version": "1.0.0",
+  "description": "Zero-config declarative runtime, router, design system, and component engine for Wovemark",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "scripts": {
+    "build": "tsc -b && node scripts/bundle-css.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@wovemark/parser": "workspace:*"
+  },
+  "keywords": ["wovemark", "runtime", "markdown", "design-system", "ai-agents"],
+  "author": "Wovemark Team",
+  "license": "MIT"
+}

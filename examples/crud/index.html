@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Krona Identity — User Management CRUD</title>
+  <link rel="stylesheet" href="../../packages/runtime/dist/styles.css" />
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    import { createWovemark, dataStore } from "../../packages/runtime/dist/index.js";
+
+    // Initialize mock database of users
+    dataStore.setMock("usersList", [
+      { id: "usr_101", name: "Alice Smith", email: "alice.smith@acme.com", role: "Super Admin", status: "Active", department: "Engineering", created: "2026-01-15" },
+      { id: "usr_102", name: "Bob Martinez", email: "bob.m@acme.com", role: "Security Lead", status: "Active", department: "Security", created: "2026-02-10" },
+      { id: "usr_103", name: "Carla Dupont", email: "c.dupont@acme.com", role: "Product Manager", status: "Active", department: "Product", created: "2026-03-01" },
+      { id: "usr_104", name: "Devon Vance", email: "devon.v@acme.com", role: "Developer", status: "Invited", department: "Engineering", created: "2026-08-20" },
+      { id: "usr_105", name: "Elena Rostova", email: "elena@acme.com", role: "Billing Admin", status: "Suspended", department: "Finance", created: "2025-11-12" }
+    ]);
+
+    dataStore.setMock("rolesList", [
+      { id: "role_1", name: "Super Admin", permissions: "Full System Access", userCount: "2 users" },
+      { id: "role_2", name: "Security Lead", permissions: "Audit Logs & SAML Management", userCount: "4 users" },
+      { id: "role_3", name: "Developer", permissions: "Read / Write API Tokens", userCount: "48 users" },
+      { id: "role_4", name: "Auditor", permissions: "Read-Only Compliance Access", userCount: "3 users" }
+    ]);
+
+    createWovemark({
+      mount: "#app"
+    });
+  </script>
+</body>
+</html>

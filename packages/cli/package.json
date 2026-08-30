@@ -1,0 +1,23 @@
+{
+  "name": "@wovemark/cli",
+  "version": "1.0.0",
+  "description": "Command-line tool for Wovemark projects: dev server, validation, inspection, and scaffolding",
+  "type": "module",
+  "bin": {
+    "wovemark": "./dist/bin.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b && chmod +x dist/bin.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@wovemark/parser": "workspace:*",
+    "@wovemark/runtime": "workspace:*"
+  },
+  "keywords": ["wovemark", "cli", "dev-server", "validator", "ai-agents"],
+  "author": "Wovemark Team",
+  "license": "MIT"
+}
