@@ -204,6 +204,9 @@ export class ComponentRegistry {
               ${logo ? `<img src="${logo}" alt="${title}" style="height:28px" />` : renderIcon("sparkles", 22, "wm-color-accent")}
               <span>${title}</span>
             </a>
+            <button class="wm-nav-toggle" aria-label="Toggle Navigation" onclick="this.nextElementSibling.classList.toggle('wm-nav-open')">
+              ${renderIcon("menu", 20)}
+            </button>
             <ul class="wm-nav-links">${children}</ul>
           </div>
         </nav>
@@ -252,14 +255,47 @@ export class ComponentRegistry {
     });
 
     this.register("tabs", (node, children) => {
-      return `<div class="wm-tabs">${children}</div>`;
+      const tabItems: Array<{ id: string; label: string }> = [];
+      if (node.type === "ContainerDirective" && node.children) {
+        node.children.forEach((c, idx) => {
+          if (c.type === "ContainerDirective" && c.name === "tab-item") {
+            const id = String(c.attributes.id || `tab-${idx}`);
+            const label = String(c.attributes.label || `Tab ${idx + 1}`);
+            tabItems.push({ id, label });
+          }
+        });
+      }
+
+      const headerHtml = tabItems.length > 0
+        ? `<div class="wm-tabs-header">
+            ${tabItems.map((t, idx) => `
+              <button type="button" class="wm-tab-btn ${idx === 0 ? "wm-active" : ""}" data-target="${t.id}">
+                ${t.label}
+              </button>
+            `).join("")}
+          </div>`
+        : "";
+
+      // Ensure the first tab panel has wm-active if none have it
+      let panelsHtml = children;
+      if (!panelsHtml.includes("wm-tab-panel wm-active") && panelsHtml.includes("wm-tab-panel")) {
+        panelsHtml = panelsHtml.replace('class="wm-tab-panel"', 'class="wm-tab-panel wm-active"');
+      }
+
+      return `
+        <div class="wm-tabs">
+          ${headerHtml}
+          <div class="wm-tabs-panels">${panelsHtml}</div>
+        </div>
+      `;
     });
 
     this.register("tab-item", (node, children) => {
       const id = node.attributes.id || `tab-${Math.random().toString(36).slice(2, 6)}`;
       const label = node.attributes.label || "Tab";
+      const active = node.attributes.active ? " wm-active" : "";
       return `
-        <div class="wm-tab-panel wm-active" id="${id}" data-tab-label="${label}">
+        <div class="wm-tab-panel${active}" id="${id}" data-tab-label="${label}">
           ${children}
         </div>
       `;
@@ -387,30 +423,31 @@ export class ComponentRegistry {
     // Marketing Blocks
     this.register("hero", (node, children) => {
       const variant = node.attributes.variant || "split";
-      const badge = node.attributes.badge ? `<span class="wm-badge wm-badge-accent" style="margin-bottom:16px">${node.attributes.badge}</span>` : "";
+      const badge = node.attributes.badge ? `<span class="wm-badge wm-badge-accent" style="margin-bottom:16px;align-self:flex-start">${node.attributes.badge}</span>` : "";
       const image = node.attributes.image;
       const motion = node.attributes.motion || "reveal";
+      const align = node.attributes.align || (variant === "centered" || variant === "editorial" ? "center" : "left");
 
-      if (variant === "centered") {
+      if (variant === "centered" || variant === "editorial") {
         return `
-          <div class="wm-hero wm-${motion}">
-            <div class="wm-container wm-hero-centered">
+          <div class="wm-hero wm-hero-${variant} wm-${motion}">
+            <div class="wm-container wm-hero-centered" style="text-align:${align}">
               ${badge}
-              ${children}
-              ${image ? `<div class="wm-hero-media" style="margin-top:40px"><img src="${image}" alt="Preview" /></div>` : ""}
+              <div class="wm-hero-content">${children}</div>
+              ${image ? `<div class="wm-hero-media" style="margin-top:40px"><img src="${image}" alt="Preview" loading="eager" /></div>` : ""}
             </div>
           </div>
         `;
       }
 
       return `
-        <div class="wm-hero wm-${motion}">
-          <div class="wm-container wm-hero-split">
-            <div>
+        <div class="wm-hero wm-hero-${variant} wm-${motion}">
+          <div class="wm-container wm-hero-split" style="text-align:${align}">
+            <div class="wm-hero-text">
               ${badge}
-              ${children}
+              <div class="wm-hero-content">${children}</div>
             </div>
-            ${image ? `<div class="wm-hero-media"><img src="${image}" alt="Preview" /></div>` : ""}
+            ${image ? `<div class="wm-hero-media"><img src="${image}" alt="Preview" loading="eager" /></div>` : ""}
           </div>
         </div>
       `;
@@ -529,7 +566,7 @@ export class ComponentRegistry {
             <span style="font-size:1rem;font-weight:400;color:var(--wm-text-muted)">${period}</span>
           </div>
           <div class="wm-pricing-features">${children}</div>
-          <button class="wm-button wm-button-${ctaVariant} wm-button-lg" style="width:100%"${ctaAction}>${ctaLabel}</button>
+          <button class="wm-button wm-button-${ctaVariant} wm-button-lg" style="width:100%;margin-top:auto"${ctaAction}>${ctaLabel}</button>
         </div>
       `;
     });
@@ -552,7 +589,20 @@ export class ComponentRegistry {
 
     // Product UI
     this.register("app-shell", (_node, children) => {
-      return `<div class="wm-app-shell">${children}</div>`;
+      const sidebarMatch = children.match(/<aside class="wm-sidebar">[\s\S]*?<\/aside>/);
+      if (sidebarMatch) {
+        const sidebarHtml = sidebarMatch[0];
+        const restHtml = children.replace(sidebarHtml, "").trim();
+        return `
+          <div class="wm-app-shell">
+            ${sidebarHtml}
+            <main class="wm-app-main">
+              <div class="wm-app-content">${restHtml}</div>
+            </main>
+          </div>
+        `;
+      }
+      return `<div class="wm-app-shell"><main class="wm-app-main"><div class="wm-app-content">${children}</div></main></div>`;
     });
 
     this.register("page-header", (node, children) => {
@@ -628,28 +678,55 @@ export class ComponentRegistry {
       const sourceKey = String(node.attributes.source || "");
       const items: any[] = Array.isArray(context[sourceKey]) ? context[sourceKey] : [];
 
+      // Extract explicit column fields if defined in node children
+      const explicitFields: string[] = [];
+      if (node.type === "ContainerDirective" && node.children) {
+        for (const child of node.children) {
+          if (child.type === "ElementDirective" && child.name === "column" && child.attributes.field) {
+            explicitFields.push(String(child.attributes.field));
+          }
+        }
+      }
+
       return `
         <div class="wm-table-container">
           <div class="wm-table-toolbar">
-            <input type="search" class="wm-input wm-table-search" placeholder="Search records..." />
+            <input type="search" class="wm-input wm-table-search" placeholder="Search records in real-time..." />
             <div class="wm-cluster">
               <span class="wm-badge wm-badge-accent">${items.length} records</span>
             </div>
           </div>
-          <table class="wm-table">
-            <thead>
-              <tr>${children}</tr>
-            </thead>
-            <tbody>
-              ${items.length === 0
-                ? `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--wm-text-muted)">${node.attributes.emptyTitle || "No records found"}</td></tr>`
-                : items.map((item: any) => `
-                  <tr>
-                    ${Object.keys(item).map((k) => `<td>${item[k] !== null && item[k] !== undefined ? item[k] : ""}</td>`).join("")}
-                  </tr>
-                `).join("")}
-            </tbody>
-          </table>
+          <div class="wm-table-responsive">
+            <table class="wm-table">
+              <thead>
+                <tr>${children}</tr>
+              </thead>
+              <tbody>
+                ${items.length === 0
+                  ? `<tr><td colspan="12" style="text-align:center;padding:32px;color:var(--wm-text-muted)">${node.attributes.emptyTitle || "No records found"}</td></tr>`
+                  : items.map((item: any) => {
+                      const fieldsToRender = explicitFields.length > 0 ? explicitFields : Object.keys(item);
+                      return `
+                        <tr>
+                          ${fieldsToRender.map((k) => {
+                            const val = item[k];
+                            if (val === null || val === undefined) return `<td></td>`;
+                            const lowerStr = String(val).toLowerCase();
+                            if (k === "status" || k === "Health Status" || k === "state") {
+                              const isSuccess = ["healthy", "active", "paid", "success", "completed", "approved", "ok"].includes(lowerStr);
+                              const isDanger = ["suspended", "failed", "error", "blocked", "down"].includes(lowerStr);
+                              const isWarning = ["invited", "pending", "processing", "review"].includes(lowerStr);
+                              const badgeClass = isSuccess ? "wm-badge-success" : isDanger ? "wm-badge-danger" : isWarning ? "wm-badge-warning" : "wm-badge-accent";
+                              return `<td><span class="wm-badge ${badgeClass}">${val}</span></td>`;
+                            }
+                            return `<td>${val}</td>`;
+                          }).join("")}
+                        </tr>
+                      `;
+                    }).join("")}
+              </tbody>
+            </table>
+          </div>
         </div>
       `;
     });

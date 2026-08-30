@@ -5,6 +5,7 @@ import { ComponentRegistry, componentRegistry, renderAST } from "./renderer/regi
 import { RouterOptions, WovemarkRouter } from "./router/router.js";
 import { applyThemeDials } from "./theme/tokens.js";
 
+export * from "@wovemark/parser";
 export * from "./actions/engine.js";
 export * from "./data/store.js";
 export * from "./data/evaluator.js";

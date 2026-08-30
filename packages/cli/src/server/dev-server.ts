@@ -87,8 +87,22 @@ export function startDevServer(options: DevServerOptions = {}) {
       return;
     }
 
-    // Serve files
+    // Serve files with runtime fallback support
     let targetFilePath = path.join(rootDir, pathname);
+
+    // Fallback: Check if requesting runtime assets directly
+    if (!fs.existsSync(targetFilePath)) {
+      const monorepoRuntimeDist = path.resolve(__dirname, "../../../runtime/dist");
+      if (pathname === "/wovemark.js" || pathname === "/@wovemark/runtime") {
+        targetFilePath = path.join(monorepoRuntimeDist, "index.js");
+      } else if (pathname === "/styles.css" || pathname === "/@wovemark/runtime/styles.css") {
+        targetFilePath = path.join(monorepoRuntimeDist, "styles.css");
+      } else if (pathname.includes("/packages/runtime/dist/")) {
+        const subPath = pathname.split("/packages/runtime/dist/")[1];
+        targetFilePath = path.join(monorepoRuntimeDist, subPath);
+      }
+    }
+
     if (fs.existsSync(targetFilePath) && fs.statSync(targetFilePath).isDirectory()) {
       targetFilePath = path.join(targetFilePath, "index.html");
     }

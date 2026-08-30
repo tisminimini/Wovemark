@@ -13,7 +13,7 @@
     "./styles.css": "./dist/styles.css"
   },
   "scripts": {
-    "build": "tsc -b && node scripts/bundle-css.js",
+    "build": "tsc -b && node scripts/bundle.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

@@ -68,7 +68,7 @@ export function parseAttributes(rawAttrs: string): DirectiveAttributes {
         if (i < len && str[i] === quoteChar) {
           i++; // consume closing quote
         }
-        attributes[key] = parseAttributeValue(val);
+        attributes[key] = parseAttributeValue(val, key);
       } else {
         // Unquoted value (number, boolean, or bare word)
         const valStart = i;
@@ -76,7 +76,7 @@ export function parseAttributes(rawAttrs: string): DirectiveAttributes {
           i++;
         }
         const valStr = str.slice(valStart, i);
-        attributes[key] = parseAttributeValue(valStr);
+        attributes[key] = parseAttributeValue(valStr, key);
       }
     } else {
       // Boolean flag without value: e.g. `required`, `disabled`
@@ -87,7 +87,9 @@ export function parseAttributes(rawAttrs: string): DirectiveAttributes {
   return attributes;
 }
 
-function parseAttributeValue(val: string): DirectiveAttributeValue {
+const LIST_ATTRIBUTE_KEYS = new Set(["options", "tags", "categories", "items", "keys"]);
+
+function parseAttributeValue(val: string, key?: string): DirectiveAttributeValue {
   if (val === "true") return true;
   if (val === "false") return false;
   if (/^-?\d+(\.\d+)?$/.test(val)) {
@@ -106,8 +108,8 @@ function parseAttributeValue(val: string): DirectiveAttributeValue {
     }
   }
 
-  // Comma-separated list helper (e.g. "Admin, Editor, Viewer")
-  if (val.includes(",") && !val.includes("\n")) {
+  // Comma-separated list only for specific array properties (e.g. options="Admin, Editor, Viewer")
+  if (key && LIST_ATTRIBUTE_KEYS.has(key.toLowerCase()) && val.includes(",") && !val.includes("\n")) {
     const items = val.split(",").map((s) => s.trim());
     if (items.length > 1) {
       return items;

@@ -119,8 +119,26 @@ export class WovemarkRouter {
       const errorOverlayHtml = this.debug && diagnostics.length > 0 ? this.renderErrorOverlay(diagnostics, filePath) : "";
 
       this.mountEl.innerHTML = `${html}${errorOverlayHtml}`;
+      this.syncActiveNavLinks();
       motionEngine.attach(this.mountEl);
       window.scrollTo(0, 0);
+    });
+  }
+
+  private syncActiveNavLinks() {
+    if (!this.mountEl) return;
+    const currentHash = window.location.hash || "#";
+    const cleanHash = currentHash.split("?")[0];
+
+    this.mountEl.querySelectorAll<HTMLAnchorElement>(".wm-nav-link, .wm-sidebar-item").forEach((link) => {
+      const href = link.getAttribute("href");
+      if (!href) return;
+      const isMatch = (cleanHash === "#" && (href === "#" || href === "" || href === "#/")) || href === cleanHash;
+      if (isMatch) {
+        link.classList.add("wm-active");
+      } else {
+        link.classList.remove("wm-active");
+      }
     });
   }
 
@@ -132,6 +150,7 @@ export class WovemarkRouter {
     const ast = parseWovemark(source, { file: this.currentFilePath });
     const html = renderAST(ast, snapshot);
     this.mountEl.innerHTML = html;
+    this.syncActiveNavLinks();
     motionEngine.attach(this.mountEl);
   }
 
