@@ -219,12 +219,63 @@ var ActionEngine = class {
         const tableContainer = searchInput.closest(".wm-table-container");
         if (tableContainer) {
           const query = searchInput.value.toLowerCase().trim();
-          const rows = tableContainer.querySelectorAll("tbody tr");
+          const rows = Array.from(tableContainer.querySelectorAll("tbody tr"));
+          let visibleCount = 0;
           rows.forEach((row) => {
             const text = row.textContent?.toLowerCase() || "";
-            row.style.display = query === "" || text.includes(query) ? "" : "none";
+            const matches = query === "" || text.includes(query);
+            row.style.display = matches ? "" : "none";
+            if (matches) visibleCount++;
           });
+          const countBadge = tableContainer.querySelector(".wm-record-count");
+          if (countBadge) {
+            countBadge.textContent = query === "" ? `${rows.length} records` : `${visibleCount} found`;
+          }
+          const pagination = tableContainer.querySelector(".wm-table-pagination");
+          if (pagination) {
+            pagination.style.display = query === "" ? "flex" : "none";
+          }
         }
+      }
+      const inputEl = e.target;
+      if (inputEl && (inputEl.classList.contains("wm-input") || inputEl.classList.contains("wm-textarea") || inputEl.classList.contains("wm-select"))) {
+        inputEl.classList.remove("wm-input-error");
+        const parentField = inputEl.closest(".wm-field");
+        const errEl = parentField?.querySelector(".wm-field-error");
+        if (errEl) errEl.remove();
+      }
+    });
+    document.addEventListener("click", (e) => {
+      const prevBtn = e.target.closest(".wm-page-prev");
+      const nextBtn = e.target.closest(".wm-page-next");
+      if (prevBtn || nextBtn) {
+        const paginationEl = (prevBtn || nextBtn).closest(".wm-table-pagination");
+        const tableContainer = paginationEl.closest(".wm-table-container");
+        if (!paginationEl || !tableContainer) return;
+        let currentPage = parseInt(paginationEl.getAttribute("data-current-page") || "1", 10);
+        const pageSize = parseInt(paginationEl.getAttribute("data-page-size") || "10", 10);
+        const total = parseInt(paginationEl.getAttribute("data-total") || "0", 10);
+        const totalPages = Math.ceil(total / pageSize) || 1;
+        if (prevBtn && currentPage > 1) {
+          currentPage--;
+        } else if (nextBtn && currentPage < totalPages) {
+          currentPage++;
+        }
+        paginationEl.setAttribute("data-current-page", String(currentPage));
+        const rows = Array.from(tableContainer.querySelectorAll("tbody tr"));
+        const startIdx = (currentPage - 1) * pageSize;
+        const endIdx = currentPage * pageSize;
+        rows.forEach((row, idx) => {
+          row.style.display = idx >= startIdx && idx < endIdx ? "" : "none";
+        });
+        const infoEl = paginationEl.querySelector(".wm-pagination-info");
+        if (infoEl) {
+          infoEl.textContent = `Showing ${startIdx + 1}-${Math.min(endIdx, total)} of ${total}`;
+        }
+        const pBtn = paginationEl.querySelector(".wm-page-prev");
+        const nBtn = paginationEl.querySelector(".wm-page-next");
+        if (pBtn) pBtn.disabled = currentPage <= 1;
+        if (nBtn) nBtn.disabled = currentPage >= totalPages;
       }
     });
     document.addEventListener("click", (e) => {
@@ -237,8 +288,17 @@ var ActionEngine = class {
           const rows = Array.from(tbody.querySelectorAll("tr"));
           if (rows.length === 0) return;
           const isAsc = th.getAttribute("data-sort") !== "asc";
-          table.querySelectorAll("th.wm-sortable").forEach((h) => h.removeAttribute("data-sort"));
+          table.querySelectorAll("th.wm-sortable").forEach((h) => {
+            h.removeAttribute("data-sort");
+            const indicator = h.querySelector(".wm-sort-arrow");
+            if (indicator) indicator.remove();
+          });
           th.setAttribute("data-sort", isAsc ? "asc" : "desc");
+          const arrow = document.createElement("span");
+          arrow.className = "wm-sort-arrow";
+          arrow.style.marginLeft = "4px";
+          arrow.textContent = isAsc ? "\u25B2" : "\u25BC";
+          th.appendChild(arrow);
           rows.sort((a, b) => {
             const aVal = a.children[thIndex]?.textContent?.trim() || "";
             const bVal = b.children[thIndex]?.textContent?.trim() || "";
@@ -320,8 +380,12 @@ var ActionEngine = class {
       if (themeCmd === "toggle") {
         newTheme = currentTheme === "dark" ? "light" : "dark";
       }
+      document.documentElement.classList.add("wm-theme-transitioning");
       document.documentElement.setAttribute("data-wm-theme", newTheme);
       localStorage.setItem("wm-theme-preference", newTheme);
+      setTimeout(() => {
+        document.documentElement.classList.remove("wm-theme-transitioning");
+      }, 300);
       this.showToast(`Theme set to ${newTheme}`, "info");
     } else if (action.startsWith("copy:")) {
       const textToCopy = action.slice(5).trim();
@@ -335,6 +399,45 @@ var ActionEngine = class {
     const submitAttr = form.getAttribute("data-wm-submit") || "";
     const successAction = form.getAttribute("data-wm-success") || "";
     const errorAction = form.getAttribute("data-wm-error") || "";
+    let hasError = false;
+    let firstInvalidField = null;
+    const requiredFields = form.querySelectorAll("[required]");
+    requiredFields.forEach((field) => {
+      const parent = field.closest(".wm-field");
+      const existingErr = parent?.querySelector(".wm-field-error");
+      if (existingErr) existingErr.remove();
+      let isFieldInvalid = false;
+      let errorMsg = "This field is required";
+      if (!field.value || field.value.trim() === "") {
+        isFieldInvalid = true;
+      } else if (field.type === "email") {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(field.value.trim())) {
+          isFieldInvalid = true;
+          errorMsg = "Please enter a valid email address";
+        }
+      }
+      if (isFieldInvalid) {
+        hasError = true;
+        field.classList.add("wm-input-error");
+        if (!firstInvalidField) firstInvalidField = field;
+        if (parent) {
+          const errDiv = document.createElement("span");
+          errDiv.className = "wm-field-error";
+          errDiv.textContent = errorMsg;
+          parent.appendChild(errDiv);
+        }
+      } else {
+        field.classList.remove("wm-input-error");
+      }
+    });
+    if (hasError) {
+      if (firstInvalidField) {
+        firstInvalidField.focus();
+      }
+      this.showToast("Please fill all required fields correctly", "warning");
+      return;
+    }
     const formData = new FormData(form);
     const data = {};
     formData.forEach((val, key) => {
@@ -486,6 +589,65 @@ function renderSvgChart(type = "line", data, options = {}) {
   if (normalized.length === 0) {
     return `<div class="wm-empty-chart" style="height:${height}px;display:flex;align-items:center;justify-content:center;color:var(--wm-text-muted)">No data available</div>`;
   }
+  if (type === "pie" || type === "donut") {
+    const total = normalized.reduce((sum, d) => sum + (d.value || 0), 0) || 1;
+    const cx = width / 3;
+    const cy = height / 2;
+    const radius = Math.min(cx, cy) - 20;
+    const innerRadius = type === "donut" ? radius * 0.55 : 0;
+    const colors = [
+      "var(--wm-color-accent)",
+      "#10b981",
+      "#8b5cf6",
+      "#f59e0b",
+      "#ec4899",
+      "#06b6d4",
+      "#6366f1",
+      "#14b8a6"
+    ];
+    let currentAngle = -Math.PI / 2;
+    const slices = [];
+    const legendItems = [];
+    normalized.forEach((d, i) => {
+      const sliceAngle = d.value / total * 2 * Math.PI;
+      const endAngle = currentAngle + sliceAngle;
+      const sliceColor = colors[i % colors.length];
+      const pct = Math.round(d.value / total * 100);
+      const x1 = cx + radius * Math.cos(currentAngle);
+      const y1 = cy + radius * Math.sin(currentAngle);
+      const x2 = cx + radius * Math.cos(endAngle);
+      const y2 = cy + radius * Math.sin(endAngle);
+      const x3 = cx + innerRadius * Math.cos(endAngle);
+      const y3 = cy + innerRadius * Math.sin(endAngle);
+      const x4 = cx + innerRadius * Math.cos(currentAngle);
+      const y4 = cy + innerRadius * Math.sin(currentAngle);
+      const largeArc = sliceAngle > Math.PI ? 1 : 0;
+      const pathData = innerRadius > 0 ? `M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} L ${x3} ${y3} A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${x4} ${y4} Z` : `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+      slices.push(`
+        <path d="${pathData}" fill="${sliceColor}" class="wm-chart-slice" style="cursor:pointer;transition:transform 150ms ease">
+          <title>${d.label}: ${d.value} (${pct}%)</title>
+        </path>
+      `);
+      legendItems.push(`
+        <div style="display:flex;align-items:center;gap:8px;font-size:0.85rem">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sliceColor}"></span>
+          <span style="color:var(--wm-text-muted)">${d.label}</span>
+          <strong style="margin-left:auto">${pct}%</strong>
+        </div>
+      `);
+      currentAngle = endAngle;
+    });
+    return `
+      <div style="display:flex;align-items:center;gap:24px;width:100%;flex-wrap:wrap">
+        <svg class="wm-chart-svg" viewBox="0 0 ${(width * 0.6).toFixed(0)} ${height}" width="${width * 0.55}" height="${height}" style="overflow:visible">
+          ${slices.join("\n")}
+        </svg>
+        <div style="flex:1;min-width:180px;display:flex;flex-direction:column;gap:8px">
+          ${legendItems.join("\n")}
+        </div>
+      </div>
+    `;
+  }
   const values = normalized.map((d) => d.value);
   const maxVal = Math.max(...values, 10);
   const minVal = Math.min(0, ...values);
@@ -493,20 +655,33 @@ function renderSvgChart(type = "line", data, options = {}) {
   const padding = { top: 20, right: 20, bottom: 40, left: 40 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
+  const gridLines = [0, 0.5, 1].map((ratio) => {
+    const y = padding.top + chartH * (1 - ratio);
+    const val = (minVal + range * ratio).toFixed(0);
+    return `
+        <line x1="${padding.left}" y1="${y.toFixed(1)}" x2="${width - padding.right}" y2="${y.toFixed(1)}" stroke="var(--wm-border-subtle)" stroke-dasharray="3,3" stroke-width="1" />
+        <text x="${(padding.left - 8).toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--wm-text-faint)">${val}</text>
+      `;
+  }).join("\n");
   if (type === "bar") {
     const barWidth = Math.max(12, Math.min(48, chartW / normalized.length * 0.6));
     const step2 = chartW / normalized.length;
     const bars = normalized.map((d, i) => {
       const x = padding.left + i * step2 + (step2 - barWidth) / 2;
-      const barH = (d.value - minVal) / range * chartH;
+      const barH = Math.max(2, (d.value - minVal) / range * chartH);
       const y = padding.top + chartH - barH;
       return `
-        <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH.toFixed(1)}" rx="4" fill="${color}" opacity="0.9" />
-        <text x="${(x + barWidth / 2).toFixed(1)}" y="${(height - 15).toFixed(1)}" text-anchor="middle" font-size="11" fill="var(--wm-text-muted)">${d.label}</text>
+        <g class="wm-chart-bar" style="cursor:pointer">
+          <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH.toFixed(1)}" rx="4" fill="${color}" opacity="0.9">
+            <title>${d.label}: ${d.value}</title>
+          </rect>
+          <text x="${(x + barWidth / 2).toFixed(1)}" y="${(height - 15).toFixed(1)}" text-anchor="middle" font-size="11" fill="var(--wm-text-muted)">${d.label}</text>
+        </g>
       `;
     }).join("\n");
     return `
       <svg class="wm-chart-svg" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" style="overflow:visible">
+        ${gridLines}
         <line x1="${padding.left}" y1="${padding.top + chartH}" x2="${width - padding.right}" y2="${padding.top + chartH}" stroke="var(--wm-border)" stroke-width="1" />
         ${bars}
       </svg>
@@ -524,8 +699,12 @@ function renderSvgChart(type = "line", data, options = {}) {
   const areaD = `${pathD} L ${points[points.length - 1].x.toFixed(1)} ${(padding.top + chartH).toFixed(1)} L ${points[0].x.toFixed(1)} ${(padding.top + chartH).toFixed(1)} Z`;
   const dots = points.map(
     (pt) => `
-    <circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="4" fill="${color}" stroke="var(--wm-surface)" stroke-width="2" />
-    <text x="${pt.x.toFixed(1)}" y="${(height - 15).toFixed(1)}" text-anchor="middle" font-size="11" fill="var(--wm-text-muted)">${pt.label}</text>
+    <g class="wm-chart-dot" style="cursor:pointer">
+      <circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="4.5" fill="${color}" stroke="var(--wm-surface)" stroke-width="2">
+        <title>${pt.label}: ${pt.value}</title>
+      </circle>
+      <text x="${pt.x.toFixed(1)}" y="${(height - 15).toFixed(1)}" text-anchor="middle" font-size="11" fill="var(--wm-text-muted)">${pt.label}</text>
+    </g>
   `
   ).join("\n");
   const gradientId = `wm-grad-${Math.random().toString(36).slice(2, 8)}`;
@@ -537,6 +716,7 @@ function renderSvgChart(type = "line", data, options = {}) {
           <stop offset="100%" stop-color="${color}" stop-opacity="0.0"/>
         </linearGradient>
       </defs>
+      ${gridLines}
       <line x1="${padding.left}" y1="${padding.top + chartH}" x2="${width - padding.right}" y2="${padding.top + chartH}" stroke="var(--wm-border)" stroke-width="1" />
       <path d="${areaD}" fill="url(#${gradientId})" />
       <path d="${pathD}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
@@ -1398,6 +1578,8 @@ var ComponentRegistry = class {
     this.register("data-table", (node, children, context) => {
       const sourceKey = String(node.attributes.source || "");
       const items = Array.isArray(context[sourceKey]) ? context[sourceKey] : [];
+      const pageSize = Number(node.attributes.pageSize || 10);
+      const isPaginationEnabled = node.attributes.pagination !== false && items.length > pageSize;
       const explicitFields = [];
       if (node.type === "ContainerDirective" && node.children) {
         for (const child of node.children) {
@@ -1407,11 +1589,11 @@ var ComponentRegistry = class {
         }
       }
       return `
-        <div class="wm-table-container">
+        <div class="wm-table-container" data-page-size="${pageSize}">
           <div class="wm-table-toolbar">
             <input type="search" class="wm-input wm-table-search" placeholder="Search records in real-time..." />
             <div class="wm-cluster">
-              <span class="wm-badge wm-badge-accent">${items.length} records</span>
+              <span class="wm-badge wm-badge-accent wm-record-count">${items.length} records</span>
             </div>
           </div>
           <div class="wm-table-responsive">
@@ -1420,10 +1602,11 @@ var ComponentRegistry = class {
                 <tr>${children}</tr>
               </thead>
               <tbody>
-                ${items.length === 0 ? `<tr><td colspan="12" style="text-align:center;padding:32px;color:var(--wm-text-muted)">${node.attributes.emptyTitle || "No records found"}</td></tr>` : items.map((item) => {
+                ${items.length === 0 ? `<tr><td colspan="12" style="text-align:center;padding:32px;color:var(--wm-text-muted)">${node.attributes.emptyTitle || "No records found"}</td></tr>` : items.map((item, idx) => {
         const fieldsToRender = explicitFields.length > 0 ? explicitFields : Object.keys(item);
+        const isVisible = idx < pageSize;
         return `
-                        <tr>
+                        <tr data-row-index="${idx}" style="${isVisible ? "" : "display:none"}">
                           ${fieldsToRender.map((k) => {
           const val = item[k];
           if (val === null || val === void 0) return `<td></td>`;
@@ -1443,6 +1626,15 @@ var ComponentRegistry = class {
               </tbody>
             </table>
           </div>
+          ${isPaginationEnabled ? `
+            <div class="wm-table-pagination" data-current-page="1" data-page-size="${pageSize}" data-total="${items.length}">
+              <span class="wm-pagination-info">Showing 1-${Math.min(pageSize, items.length)} of ${items.length}</span>
+              <div class="wm-cluster" style="gap:6px">
+                <button type="button" class="wm-button wm-button-outline wm-button-sm wm-page-prev" disabled>Previous</button>
+                <button type="button" class="wm-button wm-button-outline wm-button-sm wm-page-next"${items.length <= pageSize ? " disabled" : ""}>Next</button>
+              </div>
+            </div>
+          ` : ""}
         </div>
       `;
     });
@@ -3886,6 +4078,8 @@ var WovemarkRouter = class {
   debug = true;
   pageCache = /* @__PURE__ */ new Map();
   currentFilePath = "";
+  scrollPositions = /* @__PURE__ */ new Map();
+  lastRoute = "";
   constructor(options) {
     if (typeof document !== "undefined") {
       this.mountEl = typeof options.mount === "string" ? document.querySelector(options.mount) : options.mount;
@@ -3896,6 +4090,9 @@ var WovemarkRouter = class {
   }
   init() {
     window.addEventListener("hashchange", () => {
+      if (this.lastRoute) {
+        this.scrollPositions.set(this.lastRoute, window.scrollY || window.pageYOffset || 0);
+      }
       this.handleRouteChange();
     });
     dataStore.subscribe((snapshot) => {
@@ -3905,12 +4102,21 @@ var WovemarkRouter = class {
   }
   async handleRouteChange() {
     const rawHash = window.location.hash.replace(/^#\/?/, "");
-    const cleanRoute = rawHash.split("?")[0].trim();
+    const [routePart, queryPart] = rawHash.split("?");
+    const cleanRoute = (routePart || "").trim();
+    this.lastRoute = cleanRoute || "index";
     const fileName = cleanRoute ? `${cleanRoute}.wovemark.md` : "index.wovemark.md";
     const filePath = this.basePath ? `${this.basePath.replace(/\/$/, "")}/${fileName}` : fileName;
-    await this.loadPage(filePath);
+    const queryParams = {};
+    if (queryPart) {
+      const searchParams = new URLSearchParams(queryPart);
+      searchParams.forEach((val, key) => {
+        queryParams[key] = val;
+      });
+    }
+    await this.loadPage(filePath, queryParams);
   }
-  async loadPage(filePath) {
+  async loadPage(filePath, queryParams = {}) {
     this.currentFilePath = filePath;
     try {
       let source = this.pageCache.get(filePath);
@@ -3922,12 +4128,12 @@ var WovemarkRouter = class {
         source = await response.text();
         this.pageCache.set(filePath, source);
       }
-      await this.renderPage(source, filePath);
+      await this.renderPage(source, filePath, queryParams);
     } catch (err) {
       this.render404(filePath, err.message);
     }
   }
-  async renderPage(source, filePath) {
+  async renderPage(source, filePath, queryParams = {}) {
     if (!this.mountEl) return;
     const ast = parseWovemark(source, { file: filePath });
     const diagnostics = validateAST(ast);
@@ -3952,12 +4158,21 @@ var WovemarkRouter = class {
     });
     await motionEngine.transitionPage(() => {
       if (!this.mountEl) return;
-      const html = renderAST(ast, dataStore.getStateSnapshot());
+      const context = {
+        ...dataStore.getStateSnapshot(),
+        $query: queryParams
+      };
+      const html = renderAST(ast, context);
       const errorOverlayHtml = this.debug && diagnostics.length > 0 ? this.renderErrorOverlay(diagnostics, filePath) : "";
       this.mountEl.innerHTML = `${html}${errorOverlayHtml}`;
       this.syncActiveNavLinks();
       motionEngine.attach(this.mountEl);
-      window.scrollTo(0, 0);
+      const savedScroll = this.scrollPositions.get(this.lastRoute);
+      if (typeof savedScroll === "number") {
+        window.scrollTo(0, savedScroll);
+      } else {
+        window.scrollTo(0, 0);
+      }
     });
   }
   syncActiveNavLinks() {

@@ -17,6 +17,8 @@ export class WovemarkRouter {
   private debug: boolean = true;
   private pageCache: Map<string, string> = new Map();
   private currentFilePath: string = "";
+  private scrollPositions: Map<string, number> = new Map();
+  private lastRoute: string = "";
 
   constructor(options: RouterOptions) {
     if (typeof document !== "undefined") {
@@ -34,6 +36,10 @@ export class WovemarkRouter {
 
   private init() {
     window.addEventListener("hashchange", () => {
+      // Save scroll position of previous route before switching
+      if (this.lastRoute) {
+        this.scrollPositions.set(this.lastRoute, window.scrollY || window.pageYOffset || 0);
+      }
       this.handleRouteChange();
     });
 
@@ -48,15 +54,27 @@ export class WovemarkRouter {
 
   public async handleRouteChange() {
     const rawHash = window.location.hash.replace(/^#\/?/, "");
-    const cleanRoute = rawHash.split("?")[0].trim();
+    const [routePart, queryPart] = rawHash.split("?");
+    const cleanRoute = (routePart || "").trim();
+
+    this.lastRoute = cleanRoute || "index";
 
     const fileName = cleanRoute ? `${cleanRoute}.wovemark.md` : "index.wovemark.md";
     const filePath = this.basePath ? `${this.basePath.replace(/\/$/, "")}/${fileName}` : fileName;
 
-    await this.loadPage(filePath);
+    // Parse query params into dictionary
+    const queryParams: Record<string, string> = {};
+    if (queryPart) {
+      const searchParams = new URLSearchParams(queryPart);
+      searchParams.forEach((val, key) => {
+        queryParams[key] = val;
+      });
+    }
+
+    await this.loadPage(filePath, queryParams);
   }
 
-  public async loadPage(filePath: string) {
+  public async loadPage(filePath: string, queryParams: Record<string, string> = {}) {
     this.currentFilePath = filePath;
 
     try {
@@ -71,13 +89,13 @@ export class WovemarkRouter {
         this.pageCache.set(filePath, source);
       }
 
-      await this.renderPage(source, filePath);
+      await this.renderPage(source, filePath, queryParams);
     } catch (err: any) {
       this.render404(filePath, err.message);
     }
   }
 
-  public async renderPage(source: string, filePath: string) {
+  public async renderPage(source: string, filePath: string, queryParams: Record<string, string> = {}) {
     if (!this.mountEl) return;
 
     // 1. Parse AST
@@ -115,13 +133,24 @@ export class WovemarkRouter {
     // 6. Transition & Mount
     await motionEngine.transitionPage(() => {
       if (!this.mountEl) return;
-      const html = renderAST(ast, dataStore.getStateSnapshot());
+      const context = {
+        ...dataStore.getStateSnapshot(),
+        $query: queryParams,
+      };
+      const html = renderAST(ast, context);
       const errorOverlayHtml = this.debug && diagnostics.length > 0 ? this.renderErrorOverlay(diagnostics, filePath) : "";
 
       this.mountEl.innerHTML = `${html}${errorOverlayHtml}`;
       this.syncActiveNavLinks();
       motionEngine.attach(this.mountEl);
-      window.scrollTo(0, 0);
+
+      // Restore scroll position or scroll to top
+      const savedScroll = this.scrollPositions.get(this.lastRoute);
+      if (typeof savedScroll === "number") {
+        window.scrollTo(0, savedScroll);
+      } else {
+        window.scrollTo(0, 0);
+      }
     });
   }
 

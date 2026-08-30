@@ -677,6 +677,8 @@ export class ComponentRegistry {
     this.register("data-table", (node, children, context) => {
       const sourceKey = String(node.attributes.source || "");
       const items: any[] = Array.isArray(context[sourceKey]) ? context[sourceKey] : [];
+      const pageSize = Number(node.attributes.pageSize || 10);
+      const isPaginationEnabled = node.attributes.pagination !== false && items.length > pageSize;
 
       // Extract explicit column fields if defined in node children
       const explicitFields: string[] = [];
@@ -689,11 +691,11 @@ export class ComponentRegistry {
       }
 
       return `
-        <div class="wm-table-container">
+        <div class="wm-table-container" data-page-size="${pageSize}">
           <div class="wm-table-toolbar">
             <input type="search" class="wm-input wm-table-search" placeholder="Search records in real-time..." />
             <div class="wm-cluster">
-              <span class="wm-badge wm-badge-accent">${items.length} records</span>
+              <span class="wm-badge wm-badge-accent wm-record-count">${items.length} records</span>
             </div>
           </div>
           <div class="wm-table-responsive">
@@ -704,10 +706,11 @@ export class ComponentRegistry {
               <tbody>
                 ${items.length === 0
                   ? `<tr><td colspan="12" style="text-align:center;padding:32px;color:var(--wm-text-muted)">${node.attributes.emptyTitle || "No records found"}</td></tr>`
-                  : items.map((item: any) => {
+                  : items.map((item: any, idx: number) => {
                       const fieldsToRender = explicitFields.length > 0 ? explicitFields : Object.keys(item);
+                      const isVisible = idx < pageSize;
                       return `
-                        <tr>
+                        <tr data-row-index="${idx}" style="${isVisible ? "" : "display:none"}">
                           ${fieldsToRender.map((k) => {
                             const val = item[k];
                             if (val === null || val === undefined) return `<td></td>`;
@@ -727,6 +730,15 @@ export class ComponentRegistry {
               </tbody>
             </table>
           </div>
+          ${isPaginationEnabled ? `
+            <div class="wm-table-pagination" data-current-page="1" data-page-size="${pageSize}" data-total="${items.length}">
+              <span class="wm-pagination-info">Showing 1-${Math.min(pageSize, items.length)} of ${items.length}</span>
+              <div class="wm-cluster" style="gap:6px">
+                <button type="button" class="wm-button wm-button-outline wm-button-sm wm-page-prev" disabled>Previous</button>
+                <button type="button" class="wm-button wm-button-outline wm-button-sm wm-page-next"${items.length <= pageSize ? " disabled" : ""}>Next</button>
+              </div>
+            </div>
+          ` : ""}
         </div>
       `;
     });
